@@ -1,51 +1,26 @@
-"""
-Climate Stress Test (ACPR/BCE-inspired) — Simple academic implementation
------------------------------------------------------------------------
-
-Reads an Excel file 'portfolio_climat.xlsx' containing:
-- Sheet 'Portfolio' (loan-level data)
-- Sheet 'Scenario_Uplifts' (sector x scenario uplifts for PD and LGD)
-
-Outputs:
-- results_<Scenario>.csv (loan-level results)
-- summary_by_sector_<Scenario>.csv
-- summary_by_country_<Scenario>.csv
-- climate_var_summary.csv
-
-Usage:
-    python climate_stress_test.py --input portfolio_climat.xlsx --alpha 0.95
-
-Notes:
-- This is a simplified pedagogical model (uplifts are assumed inputs).
-- PD is annual, LGD is fraction, EAD in EUR.
-"""
-
 from __future__ import annotations
 
-import argparse
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.express as px
 from dataclasses import dataclass
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
-
-
 SCENARIOS = ["Optimiste", "Neutre", "Pessimiste"]
-
 
 @dataclass(frozen=True)
 class StressTestConfig:
     alpha: float = 0.95
     cap_pd: float = 1.0
 
-
 def _require_columns(df: pd.DataFrame, cols: list[str], name: str) -> None:
     missing = [c for c in cols if c not in df.columns]
     if missing:
         raise ValueError(f"Missing columns in {name}: {missing}")
 
-
-def load_inputs(xlsx_path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+@st.cache_data
+def load_inputs(xlsx_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Load Portfolio and Scenario_Uplifts sheets."""
     portfolio = pd.read_excel(xlsx_path, sheet_name="Portfolio")
     uplifts = pd.read_excel(xlsx_path, sheet_name="Scenario_Uplifts")
@@ -65,7 +40,6 @@ def load_inputs(xlsx_path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
         "Scenario_Uplifts",
     )
 
-    # Normalize dtypes
     portfolio["sector"] = portfolio["sector"].astype(str)
     portfolio["country"] = portfolio["country"].astype(str)
     portfolio["region"] = portfolio["region"].astype(str)
@@ -73,11 +47,9 @@ def load_inputs(xlsx_path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     portfolio["PD_base"] = pd.to_numeric(portfolio["PD_base"], errors="raise")
     portfolio["LGD"] = pd.to_numeric(portfolio["LGD"], errors="raise")
     portfolio["maturity_years"] = pd.to_numeric(portfolio["maturity_years"], errors="raise")
-
     uplifts["sector"] = uplifts["sector"].astype(str)
 
     return portfolio, uplifts
-
 
 def apply_scenario(
     portfolio: pd.DataFrame,
@@ -86,9 +58,6 @@ def apply_scenario(
     cfg: StressTestConfig = StressTestConfig(),
 ) -> pd.DataFrame:
     """Return loan-level dataframe with stressed PD/LGD and projected losses."""
-    if scenario not in SCENARIOS:
-        raise ValueError(f"Unknown scenario '{scenario}'. Must be one of: {SCENARIOS}")
-
     pd_col = f"pd_uplift_{scenario}"
     lgd_col = f"lgd_uplift_{scenario}"
 
@@ -97,35 +66,20 @@ def apply_scenario(
     )
 
     df = portfolio.merge(u, on="sector", how="left")
-    if df["pd_uplift"].isna().any() or df["lgd_uplift"].isna().any():
-        missing_sectors = df.loc[df["pd_uplift"].isna() | df["lgd_uplift"].isna(), "sector"].unique().tolist()
-        raise ValueError(f"Missing uplifts for sectors: {missing_sectors}")
-
-    # Stress PD and LGD (relative uplifts)
+    
     df["PD_stress"] = np.clip(df["PD_base"] * (1.0 + df["pd_uplift"]), 0.0, cfg.cap_pd)
     df["LGD_stress"] = np.clip(df["LGD"] * (1.0 + df["lgd_uplift"]), 0.0, 1.0)
-
-    # Delta PD (only the climate-driven increase)
     df["dPD"] = np.maximum(df["PD_stress"] - df["PD_base"], 0.0)
-
-    # Projected losses (simple stress-test loss proxy)
-    # Loss = EAD * dPD * LGD_stress
     df["loss_projected"] = df["EAD_EUR"] * df["dPD"] * df["LGD_stress"]
-
-    # Useful checks / metadata
     df["scenario"] = scenario
 
-    # Reorder
     cols = [
         "scenario", "loan_id", "sector", "country", "region",
         "EAD_EUR", "PD_base", "PD_stress", "dPD",
-        "LGD", "LGD_stress",
-        "maturity_years",
-        "pd_uplift", "lgd_uplift",
-        "loss_projected",
+        "LGD", "LGD_stress", "maturity_years",
+        "pd_uplift", "lgd_uplift", "loss_projected",
     ]
     return df[cols]
-
 
 def summarize(df: pd.DataFrame, by: str) -> pd.DataFrame:
     """Aggregate projected losses by a dimension (sector/country/region)."""
@@ -142,64 +96,77 @@ def summarize(df: pd.DataFrame, by: str) -> pd.DataFrame:
     g["loss_rate_on_EAD"] = np.where(g["EAD_EUR"] > 0, g["loss_projected"] / g["EAD_EUR"], 0.0)
     return g.sort_values("loss_projected", ascending=False)
 
-
 def climate_var(losses: list[float], alpha: float = 0.95) -> float:
-    """Climate VaR: alpha-quantile of scenario losses (loss distribution across scenarios)."""
+    """Climate VaR: alpha-quantile of scenario losses."""
     arr = np.asarray(losses, dtype=float)
     return float(np.percentile(arr, 100.0 * alpha))
 
+# --- DÉBUT DE L'INTERFACE STREAMLIT ---
+def main():
+    st.set_page_config(page_title="Climate Stress Test", layout="wide", page_icon="🌍")
+    
+    st.title("🌍 Dashboard: Climate Stress Test")
+    st.markdown("Analyse des risques physiques et de transition (Inspiré ACPR/BCE)")
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=str, default="portfolio_climat.xlsx", help="Path to input Excel file.")
-    parser.add_argument("--alpha", type=float, default=0.95, help="VaR confidence level, e.g. 0.95.")
-    parser.add_argument("--outdir", type=str, default=".", help="Output directory for CSV results.")
-    args = parser.parse_args()
+    # Menu latéral pour les paramètres interactifs
+    st.sidebar.header("Paramètres")
+    alpha_input = st.sidebar.slider("Niveau de confiance VaR (Alpha)", min_value=0.80, max_value=0.99, value=0.95, step=0.01)
+    cfg = StressTestConfig(alpha=alpha_input)
 
-    xlsx_path = Path(args.input).expanduser().resolve()
-    outdir = Path(args.outdir).expanduser().resolve()
-    outdir.mkdir(parents=True, exist_ok=True)
+    # Chargement des données
+    try:
+        portfolio, uplifts = load_inputs("portfolio_climat.xlsx")
+    except Exception as e:
+        st.error(f"Erreur lors du chargement du fichier Excel: {e}")
+        return
 
-    cfg = StressTestConfig(alpha=float(args.alpha))
-
-    portfolio, uplifts = load_inputs(xlsx_path)
-
-    # Sanity check: total exposure
     total_ead = float(portfolio["EAD_EUR"].sum())
-    print(f"[INFO] Loaded {len(portfolio)} loans | Total EAD = {total_ead:,.0f} EUR")
+    st.sidebar.metric("Exposition Totale (EAD)", f"{total_ead:,.0f} €")
 
+    # Calcul des scénarios
     scenario_totals = []
+    all_results = {}
 
     for sc in SCENARIOS:
         df_sc = apply_scenario(portfolio, uplifts, sc, cfg=cfg)
-
         total_loss = float(df_sc["loss_projected"].sum())
-        scenario_totals.append((sc, total_loss))
+        scenario_totals.append({"Scénario": sc, "Pertes Projetées (€)": total_loss})
+        all_results[sc] = df_sc
 
-        # Loan-level results
-        df_sc.to_csv(outdir / f"results_{sc}.csv", index=False)
+    # Affichage de la vue d'ensemble
+    st.header("1. Vue d'ensemble des Scénarios")
+    df_totals = pd.DataFrame(scenario_totals)
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.dataframe(df_totals, use_container_width=True)
+        losses_only = [x["Pertes Projetées (€)"] for x in scenario_totals]
+        var_alpha = climate_var(losses_only, alpha=cfg.alpha)
+        st.info(f"**Climate VaR à {int(cfg.alpha*100)}% :** {var_alpha:,.0f} €")
 
-        # Summaries
-        summarize(df_sc, "sector").to_csv(outdir / f"summary_by_sector_{sc}.csv", index=False)
-        summarize(df_sc, "country").to_csv(outdir / f"summary_by_country_{sc}.csv", index=False)
-        summarize(df_sc, "region").to_csv(outdir / f"summary_by_region_{sc}.csv", index=False)
+    with col2:
+        # Création d'un graphique interactif avec Plotly
+        fig = px.bar(df_totals, x="Scénario", y="Pertes Projetées (€)", color="Scénario", title="Pertes estimées par Scénario climatique")
+        st.plotly_chart(fig, use_container_width=True)
 
-        print(f"[INFO] Scenario {sc}: projected loss = {total_loss:,.0f} EUR")
+    # Affichage des détails filtrables
+    st.header("2. Analyse Détaillée")
+    selected_scenario = st.selectbox("Sélectionnez un scénario pour voir les détails par secteur", SCENARIOS)
+    
+    df_selected = all_results[selected_scenario]
+    df_sector = summarize(df_selected, "sector")
+    
+    col3, col4 = st.columns(2)
+    with col3:
+        fig_pie = px.pie(df_sector, values="loss_projected", names="sector", title=f"Répartition des pertes par secteur ({selected_scenario})")
+        st.plotly_chart(fig_pie, use_container_width=True)
+        
+    with col4:
+        st.write("Données sectorielles agrégées :")
+        st.dataframe(df_sector[["sector", "loss_projected", "loss_rate_on_EAD"]], use_container_width=True)
 
-    # Climate VaR across scenario totals (pedagogical: distribution over NGFS-like scenarios)
-    losses_only = [x[1] for x in scenario_totals]
-    var_alpha = climate_var(losses_only, alpha=cfg.alpha)
-
-    var_df = pd.DataFrame({
-        "scenario": [x[0] for x in scenario_totals],
-        "total_loss_projected": losses_only,
-    })
-    var_df.loc[len(var_df)] = [f"ClimateVaR_{int(cfg.alpha*100)}%", var_alpha]
-    var_df.to_csv(outdir / "climate_var_summary.csv", index=False)
-
-    print(f"[INFO] Climate VaR {int(cfg.alpha*100)}% (across scenarios) = {var_alpha:,.0f} EUR")
-    print(f"[DONE] Outputs written to: {outdir}")
-
+    st.subheader("Extrait des données au niveau du prêt (Loan-level)")
+    st.dataframe(df_selected.head(100), use_container_width=True)
 
 if __name__ == "__main__":
     main()
