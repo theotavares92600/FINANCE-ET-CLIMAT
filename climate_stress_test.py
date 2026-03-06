@@ -248,34 +248,31 @@ def main():
         )
 
     # --- MODULE 4: METHODOLOGY & FRAMEWORK ---
-    with tab_meth:
-        st.subheader("Methodological Framework and Mathematical Model")
-        st.markdown("This dashboard relies on a static modeling framework inspired by regulatory climate stress testing exercises (ACPR/ECB). It assesses the financial impact of physical and transition risks on fundamental credit risk parameters.")
-        
+    # ---> ADDITION OF THE METHODOLOGICAL MAP (DIAGRAM) <---
         st.markdown("#### 🗺️ Risk Transmission Map")
         st.info("Transmission mechanism of climate shocks to the bank's balance sheet:")
         
         st.markdown("""
-        <div style="text-align: center; padding: 20px; background-color: #ffffff; border-radius: 12px; border: 1px solid #e0e6ed; margin-bottom: 25px; box-shadow: 0 4px 10px rgba(0,0,0,0.02);">
-            <h4 style="color: #1e293b; margin-bottom: 5px;">🌍 1. Climate Scenarios (NGFS)</h4>
-            <p style="color: #64748b; font-size: 0.9em;">Trajectory definition (Optimistic, Neutral, Pessimistic)</p>
-            
-            <h3 style="color: #cbd5e1; margin: 10px 0;">⬇️</h3>
-            
-            <h4 style="color: #3498db; margin-bottom: 5px;">🏭 2. Macro-Sectoral Shocks</h4>
-            <p style="color: #64748b; font-size: 0.9em;">Application of climate penalties ("Uplifts") by business sector</p>
-            
-            <h3 style="color: #cbd5e1; margin: 10px 0;">⬇️</h3>
-            
-            <h4 style="color: #e74c3c; margin-bottom: 5px;">📉 3. Credit Risk Degradation</h4>
-            <p style="color: #64748b; font-size: 0.9em;">Stress on Probability of Default (PD) and Loss Given Default (LGD)</p>
-            
-            <h3 style="color: #cbd5e1; margin: 10px 0;">⬇️</h3>
-            
-            <h4 style="color: #2ecc71; margin-bottom: 5px;">💶 4. Balance Sheet Impact</h4>
-            <p style="color: #64748b; font-size: 0.9em;">Calculation of Projected Losses on EAD and Climate Value at Risk (VaR)</p>
-        </div>
-        """, unsafe_allow_html=True)
+<div style="text-align: center; padding: 20px; background-color: #ffffff; border-radius: 12px; border: 1px solid #e0e6ed; margin-bottom: 25px; box-shadow: 0 4px 10px rgba(0,0,0,0.02);">
+    <h4 style="color: #1e293b; margin-bottom: 5px;">🌍 1. Climate Scenarios (NGFS)</h4>
+    <p style="color: #64748b; font-size: 0.9em;">Trajectory definition (Optimistic, Neutral, Pessimistic)</p>
+    
+    <h3 style="color: #cbd5e1; margin: 10px 0;">⬇️</h3>
+    
+    <h4 style="color: #3498db; margin-bottom: 5px;">🏭 2. Macro-Sectoral Shocks</h4>
+    <p style="color: #64748b; font-size: 0.9em;">Application of climate penalties ("Uplifts") by business sector</p>
+    
+    <h3 style="color: #cbd5e1; margin: 10px 0;">⬇️</h3>
+    
+    <h4 style="color: #e74c3c; margin-bottom: 5px;">📉 3. Credit Risk Degradation</h4>
+    <p style="color: #64748b; font-size: 0.9em;">Stress on Probability of Default (PD) and Loss Given Default (LGD)</p>
+    
+    <h3 style="color: #cbd5e1; margin: 10px 0;">⬇️</h3>
+    
+    <h4 style="color: #2ecc71; margin-bottom: 5px;">💶 4. Balance Sheet Impact</h4>
+    <p style="color: #64748b; font-size: 0.9em;">Calculation of Projected Losses on EAD and Climate Value at Risk (VaR)</p>
+</div>
+""", unsafe_allow_html=True)
         
         st.markdown("---")
         col_m1, col_m2 = st.columns(2)
