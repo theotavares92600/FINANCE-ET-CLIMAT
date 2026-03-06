@@ -153,10 +153,11 @@ def main():
     scenario_totals = [{"Scénario": sc, "Pertes": all_results[sc]["loss_projected"].sum()} for sc in SCENARIOS]
     
     # NAVIGATION PAR MODULES (Ajout du 3ème onglet)
-    tab_macro, tab_micro, tab_geo = st.tabs([
+    tab_macro, tab_micro, tab_geo, tab_meth = st.tabs([
         "📊 Module 1: Executive Dashboard", 
         "🔍 Module 2: Portfolio Deep-Dive",
-        "🌍 Module 3: Geographic Exposure"
+        "🌍 Module 3: Geographic Exposure",
+        "📖 Module 4: Methodology & Framework"
     ])
 
     # --- MODULE 1: EXECUTIVE DASHBOARD ---
@@ -331,6 +332,39 @@ def main():
             }), 
             use_container_width=True
         )
+        
+        # --- MODULE 4: METHODOLOGY & FRAMEWORK ---
+    with tab_meth:
+        st.subheader("Cadre Méthodologique et Modèle Mathématique")
+        st.markdown("Ce tableau de bord s'appuie sur un cadre de modélisation statique inspiré des exercices de stress tests climatiques réglementaires (ACPR/BCE). Il évalue l'impact financier des risques physiques et de transition sur les paramètres fondamentaux du risque de crédit.")
+        
+        st.markdown("---")
+        col_m1, col_m2 = st.columns(2)
+        
+        with col_m1:
+            st.markdown("#### 1. Chocs sur la Probabilité de Défaut (PD)")
+            st.markdown("Le modèle applique une pénalité (uplift) macro-sectorielle à la probabilité de défaut de base de chaque contrepartie. Le résultat est mathématiquement plafonné à 1 (défaut certain).")
+            st.latex(r"PD_{stress} = \min(PD_{base} \times (1 + \Delta PD_{sectoriel}), 1.0)")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            st.markdown("#### 2. Chocs sur la Perte en Cas de Défaut (LGD)")
+            st.markdown("La LGD subit une dégradation liée à la perte de valeur potentielle des collatéraux sous-jacents, particulièrement affectés par les risques physiques (inondations, sécheresses).")
+            st.latex(r"LGD_{stress} = \min(LGD_{base} \times (1 + \Delta LGD_{sectoriel}), 1.0)")
+
+        with col_m2:
+            st.markdown("#### 3. Calcul de la Perte Projetée (Expected Loss)")
+            st.markdown("La perte financière additionnelle induite spécifiquement par le scénario climatique est calculée sur la base du delta de risque (augmentation de la PD) et de la nouvelle LGD stressée.")
+            st.latex(r"\text{Loss}_{projected} = EAD \times \max(PD_{stress} - PD_{base}, 0) \times LGD_{stress}")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            st.markdown("#### 4. Climate Value at Risk (VaR)")
+            st.markdown("La Climate VaR représente l'estimation de la perte extrême à un niveau de confiance défini, calculée empiriquement sur la distribution des pertes de l'ensemble des scénarios simulés.")
+            st.latex(r"\text{Climate VaR}_{\alpha} = \text{Quantile}(\text{Losses}_{scenarios}, \alpha)")
+            
+        st.markdown("---")
+        st.info("💡 **Hypothèse de Bilan Statique :** L'EAD (Exposure At Default) est maintenue constante dans cet exercice. Le modèle ne simule pas de renouvellement du portefeuille ni de stratégie d'atténuation (hedging) de la part de la banque. L'impact climatique se lit donc exclusivement à travers la migration du risque de crédit.")
 
 if __name__ == "__main__":
     main()
