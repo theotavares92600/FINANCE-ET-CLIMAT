@@ -63,6 +63,11 @@ def summarize(df: pd.DataFrame, by: str) -> pd.DataFrame:
 def climate_var(losses: list[float], alpha: float) -> float:
     return float(np.percentile(np.asarray(losses), 100.0 * alpha))
 
+@st.cache_data
+def convert_df(df: pd.DataFrame):
+    # Convertit le DataFrame en CSV formaté pour le web
+    return df.to_csv(index=False).encode('utf-8')
+
 # --- INTERFACE UTILISATEUR (Front-end) ---
 def main():
     st.title("🏛️ Climate Risk Intelligence Platform")
@@ -135,6 +140,16 @@ def main():
                 "PD_stress": "{:.2%}",
                 "loss_projected": "{:,.2f} €"
             }), use_container_width=True
+        )
+        
+        # --- BOUTON D'EXPORT ---
+        st.markdown("---")
+        csv_data = convert_df(all_results[target_sc])
+        st.download_button(
+            label=f"📥 Télécharger les résultats complets ({target_sc}) en CSV",
+            data=csv_data,
+            file_name=f"stress_test_resultats_{target_sc.lower()}.csv",
+            mime="text/csv",
         )
 
     # --- MODULE 3: GEOGRAPHIC EXPOSURE ---
