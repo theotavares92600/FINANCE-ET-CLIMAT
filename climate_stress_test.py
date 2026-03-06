@@ -100,20 +100,63 @@ def main():
     with tab_macro:
         st.subheader("Analyse de Risque Agrégée")
         
+        # 1. Metrics de haut niveau enrichies
         m1, m2, m3 = st.columns(3)
         total_ead = portfolio["EAD_EUR"].sum()
         max_loss = max([s["Pertes"] for s in scenario_totals])
-        m1.metric("Exposition Totale (EAD)", f"{total_ead/1e6:,.1f}M €")
-        m2.metric("Perte Maximale Projetée", f"{max_loss:,.0f} €", delta="Stress Test", delta_color="inverse")
-        m3.metric("Climate VaR", f"{climate_var([s['Pertes'] for s in scenario_totals], cfg.alpha):,.0f} €")
-
-        st.markdown("#### Comparaison des Pertes par Scénario")
-        df_totals = pd.DataFrame(scenario_totals)
+        var_value = climate_var([s['Pertes'] for s in scenario_totals], cfg.alpha)
         
-        fig_bar = px.bar(df_totals, x="Scénario", y="Pertes", color="Scénario",
-                         color_discrete_map={"Optimiste": "#2ecc71", "Neutre": "#f1c40f", "Pessimiste": "#e74c3c"})
-        fig_bar.update_layout(plot_bgcolor="rgba(0,0,0,0)", showlegend=False)
-        st.plotly_chart(fig_bar, use_container_width=True)
+        m1.metric("Exposition Totale (EAD)", f"{total_ead/1e6:,.1f}M €")
+        m2.metric(
+            "Perte Maximale Projetée", 
+            f"{max_loss:,.0f} €", 
+            delta=f"{(max_loss/total_ead)*10000:.1f} bps de l'EAD", 
+            delta_color="inverse"
+        )
+        m3.metric(f"Climate VaR ({int(cfg.alpha*100)}%)", f"{var_value:,.0f} €")
+
+        st.markdown("---")
+
+        # 2. Section Graphiques en 2 colonnes
+        col1_macro, col2_macro = st.columns(2)
+
+        with col1_macro:
+            st.markdown("#### Pertes par Scénario Climatique")
+            df_totals = pd.DataFrame(scenario_totals)
+            fig_bar = px.bar(
+                df_totals, x="Scénario", y="Pertes", color="Scénario",
+                color_discrete_map={"Optimiste": "#2ecc71", "Neutre": "#f1c40f", "Pessimiste": "#e74c3c"}
+            )
+            fig_bar.update_layout(plot_bgcolor="rgba(0,0,0,0)", showlegend=False, margin=dict(l=0, r=0, t=30, b=0))
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+        with col2_macro:
+            st.markdown("#### Composition du Portefeuille (EAD par Secteur)")
+            df_ead_sector = portfolio.groupby("sector")["EAD_EUR"].sum().reset_index()
+            fig_donut = px.pie(
+                df_ead_sector, values="EAD_EUR", names="sector", hole=0.4,
+                color_discrete_sequence=px.colors.qualitative.Pastel
+            )
+            fig_donut.update_layout(margin=dict(l=0, r=0, t=30, b=0))
+            st.plotly_chart(fig_donut, use_container_width=True)
+
+        st.markdown("---")
+        
+        # 3. Zone d'alerte : Top 3 des secteurs à risque (Basé sur le pire scénario)
+        st.markdown("#### 🚨 Top 3 des Secteurs les plus vulnérables (Scénario Pessimiste)")
+        
+        df_pessimiste = all_results["Pessimiste"]
+        df_top_sectors = summarize(df_pessimiste, "sector").head(3)
+        top_sectors = df_top_sectors.to_dict('records')
+
+        t1, t2, t3 = st.columns(3)
+        
+        if len(top_sectors) > 0:
+            t1.error(f"**1. {top_sectors[0]['sector']}**\n\n**Perte:** {top_sectors[0]['loss_projected']:,.0f} €\n\n**Taux:** {top_sectors[0]['Loss_Rate_bps']:.1f} bps")
+        if len(top_sectors) > 1:
+            t2.warning(f"**2. {top_sectors[1]['sector']}**\n\n**Perte:** {top_sectors[1]['loss_projected']:,.0f} €\n\n**Taux:** {top_sectors[1]['Loss_Rate_bps']:.1f} bps")
+        if len(top_sectors) > 2:
+            t3.info(f"**3. {top_sectors[2]['sector']}**\n\n**Perte:** {top_sectors[2]['loss_projected']:,.0f} €\n\n**Taux:** {top_sectors[2]['Loss_Rate_bps']:.1f} bps")
 
     # --- MODULE 2: PORTFOLIO DEEP-DIVE ---
     with tab_micro:
