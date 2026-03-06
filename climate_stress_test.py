@@ -10,7 +10,6 @@ from dataclasses import dataclass
 # --- CONFIGURATION ET STYLE ---
 st.set_page_config(page_title="Climate Risk Intelligence", layout="wide", page_icon="🏛️")
 
-# CSS pour un look "Finance" épuré
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
@@ -85,14 +84,17 @@ def main():
     all_results = {sc: apply_scenario(portfolio, uplifts, sc, cfg) for sc in SCENARIOS}
     scenario_totals = [{"Scénario": sc, "Pertes": all_results[sc]["loss_projected"].sum()} for sc in SCENARIOS]
     
-    # NAVIGATION PAR MODULES
-    tab_macro, tab_micro = st.tabs(["📊 Module 1: Executive Dashboard", "🔍 Module 2: Portfolio Deep-Dive"])
+    # NAVIGATION PAR MODULES (Ajout du 3ème onglet)
+    tab_macro, tab_micro, tab_geo = st.tabs([
+        "📊 Module 1: Executive Dashboard", 
+        "🔍 Module 2: Portfolio Deep-Dive",
+        "🌍 Module 3: Geographic Exposure"
+    ])
 
     # --- MODULE 1: EXECUTIVE DASHBOARD ---
     with tab_macro:
         st.subheader("Analyse de Risque Agrégée")
         
-        # Metrics de haut niveau
         m1, m2, m3 = st.columns(3)
         total_ead = portfolio["EAD_EUR"].sum()
         max_loss = max([s["Pertes"] for s in scenario_totals])
@@ -115,12 +117,11 @@ def main():
         col_ctrl, col_viz = st.columns([1, 3])
         
         with col_ctrl:
-            target_sc = st.selectbox("Scénario cible", SCENARIOS)
+            target_sc = st.selectbox("Scénario cible", SCENARIOS, key="micro_sc")
             dim = st.radio("Grouper par", ["sector", "country", "region"])
             df_dim = summarize(all_results[target_sc], dim)
 
         with col_viz:
-            # Treemap pour la concentration
             fig_tree = px.treemap(df_dim, path=[dim], values='loss_projected',
                                  color='Loss_Rate_bps', color_continuous_scale='RdYlGn_r',
                                  title=f"Concentration des pertes par {dim} (bps)")
@@ -135,6 +136,55 @@ def main():
                 "loss_projected": "{:,.2f} €"
             }), use_container_width=True
         )
+
+    # --- MODULE 3: GEOGRAPHIC EXPOSURE ---
+    with tab_geo:
+        st.subheader("Cartographie des Risques Européens")
+        
+        col_geo_ctrl, col_geo_viz = st.columns([1, 3])
+        
+        with col_geo_ctrl:
+            geo_sc = st.selectbox("Scénario climatique", SCENARIOS, key="geo_sc")
+            geo_metric = st.radio("Indicateur à cartographier", [
+                "Pertes Projetées (€)", 
+                "Taux de Perte (bps)", 
+                "Exposition (EAD)"
+            ])
+            
+        df_geo = summarize(all_results[geo_sc], "country")
+        
+        # Mapping des choix utilisateur vers les colonnes du DataFrame
+        metric_col_map = {
+            "Pertes Projetées (€)": "loss_projected",
+            "Taux de Perte (bps)": "Loss_Rate_bps",
+            "Exposition (EAD)": "EAD_EUR"
+        }
+        target_col = metric_col_map[geo_metric]
+        
+        # Ajustement des couleurs selon la métrique (Bleu pour exposition, Rouge pour le risque)
+        color_scale = "Blues" if target_col == "EAD_EUR" else "Reds"
+
+        with col_geo_viz:
+            fig_map = px.choropleth(
+                df_geo,
+                locations="country", 
+                locationmode="country names", # Utilise les noms de pays en anglais présents dans vos données
+                color=target_col,
+                hover_name="country",
+                color_continuous_scale=color_scale,
+                title=f"Distribution spatiale : {geo_metric} ({geo_sc})"
+            )
+            # On centre la carte sur l'Europe
+            fig_map.update_geos(scope="europe", fitbounds="locations", showcountries=True, countrycolor="Black")
+            fig_map.update_layout(margin={"r":0,"t":40,"l":0,"b":0})
+            
+            st.plotly_chart(fig_map, use_container_width=True)
+            
+        st.dataframe(df_geo.style.format({
+            "EAD_EUR": "{:,.0f} €",
+            "loss_projected": "{:,.2f} €",
+            "Loss_Rate_bps": "{:.1f}"
+        }), use_container_width=True)
 
 if __name__ == "__main__":
     main()
