@@ -138,6 +138,7 @@ def main():
         )
 
     # --- MODULE 3: GEOGRAPHIC EXPOSURE ---
+ 
     with tab_geo:
         st.subheader("Cartographie des Risques Européens")
         
@@ -153,38 +154,53 @@ def main():
             
         df_geo = summarize(all_results[geo_sc], "country")
         
-        # Mapping des choix utilisateur vers les colonnes du DataFrame
         metric_col_map = {
             "Pertes Projetées (€)": "loss_projected",
             "Taux de Perte (bps)": "Loss_Rate_bps",
             "Exposition (EAD)": "EAD_EUR"
         }
         target_col = metric_col_map[geo_metric]
-        
-        # Ajustement des couleurs selon la métrique (Bleu pour exposition, Rouge pour le risque)
         color_scale = "Blues" if target_col == "EAD_EUR" else "Reds"
 
         with col_geo_viz:
+            # Création de colonnes formatées proprement pour l'affichage au survol
+            df_geo["EAD (Euro)"] = df_geo["EAD_EUR"].apply(lambda x: f"{x:,.0f} €")
+            df_geo["Perte (Euro)"] = df_geo["loss_projected"].apply(lambda x: f"{x:,.0f} €")
+            df_geo["Taux (bps)"] = df_geo["Loss_Rate_bps"].apply(lambda x: f"{x:.1f} bps")
+
             fig_map = px.choropleth(
                 df_geo,
                 locations="country", 
-                locationmode="country names", # Utilise les noms de pays en anglais présents dans vos données
+                locationmode="country names",
                 color=target_col,
                 hover_name="country",
+                # Configuration de l'infobulle enrichie
+                hover_data={
+                    "country": False,
+                    target_col: False,
+                    "EAD (Euro)": True,
+                    "Perte (Euro)": True,
+                    "Taux (bps)": True
+                },
                 color_continuous_scale=color_scale,
                 title=f"Distribution spatiale : {geo_metric} ({geo_sc})"
             )
-            # On centre la carte sur l'Europe
             fig_map.update_geos(scope="europe", fitbounds="locations", showcountries=True, countrycolor="Black")
             fig_map.update_layout(margin={"r":0,"t":40,"l":0,"b":0})
             
             st.plotly_chart(fig_map, use_container_width=True)
             
-        st.dataframe(df_geo.style.format({
-            "EAD_EUR": "{:,.0f} €",
-            "loss_projected": "{:,.2f} €",
-            "Loss_Rate_bps": "{:.1f}"
-        }), use_container_width=True)
+        # Tableau avec dégradé de chaleur (Heatmap) sur la colonne des risques
+        st.dataframe(
+            df_geo[["country", "EAD_EUR", "loss_projected", "Loss_Rate_bps"]]
+            .style.background_gradient(subset=['Loss_Rate_bps'], cmap='Reds')
+            .format({
+                "EAD_EUR": "{:,.0f} €",
+                "loss_projected": "{:,.0f} €",
+                "Loss_Rate_bps": "{:.1f}"
+            }), 
+            use_container_width=True
+        )
 
 if __name__ == "__main__":
     main()
