@@ -10,11 +10,74 @@ from dataclasses import dataclass
 # --- CONFIGURATION ET STYLE ---
 st.set_page_config(page_title="Climate Risk Intelligence", layout="wide", page_icon="🏛️")
 
+# --- CONFIGURATION ET STYLE AVANCÉ ---
+st.set_page_config(page_title="Climate Risk Intelligence", layout="wide", page_icon="🏛️")
+
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; border: 1px solid #e0e0e0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    [data-testid="stHeader"] { background: rgba(255,255,255,0); }
+    /* 1. Import de la police 'Inter' (très utilisée en finance/tech) */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* 2. Arrière-plan global doux pour faire ressortir les graphiques */
+    .stApp {
+        background-color: #f4f7f6;
+    }
+
+    /* 3. Design des cartes KPIs (Metrics) */
+    [data-testid="metric-container"] {
+        background-color: #ffffff;
+        border: 1px solid #e0e6ed;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+        transition: all 0.3s ease;
+    }
+    
+    /* Effet de soulèvement au survol de la souris sur les KPIs */
+    [data-testid="metric-container"]:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+        border-color: #cbd5e1;
+    }
+    
+    [data-testid="stMetricValue"] {
+        color: #1e293b;
+        font-weight: 600;
+    }
+    
+    [data-testid="stMetricLabel"] {
+        color: #64748b;
+        font-size: 1.05rem;
+        font-weight: 600;
+    }
+
+    /* 4. Stylisation des Onglets (Tabs) pour un look Dashboard pro */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 45px;
+        background-color: #ffffff;
+        border-radius: 8px 8px 0 0;
+        border: 1px solid #e0e6ed;
+        border-bottom: none;
+        padding: 0 20px;
+        color: #64748b;
+        font-weight: 600;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #0f172a; /* Bleu très sombre/Gris */
+        color: #ffffff !important;
+    }
+
+    /* Nettoyage de la barre du haut */
+    [data-testid="stHeader"] { 
+        background: rgba(255,255,255,0); 
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -127,7 +190,16 @@ def main():
                 df_totals, x="Scénario", y="Pertes", color="Scénario",
                 color_discrete_map={"Optimiste": "#2ecc71", "Neutre": "#f1c40f", "Pessimiste": "#e74c3c"}
             )
-            fig_bar.update_layout(plot_bgcolor="rgba(0,0,0,0)", showlegend=False, margin=dict(l=0, r=0, t=30, b=0))
+            # --> AJOUTEZ CETTE LIGNE POUR LE DESIGN :
+            fig_bar.update_layout(
+                font_family="Inter",
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                xaxis=dict(showgrid=False, title=""),
+                yaxis=dict(gridcolor='#e2e8f0', title=""),
+                showlegend=False, 
+                margin=dict(l=0, r=0, t=30, b=0)
+            )
             st.plotly_chart(fig_bar, use_container_width=True)
 
         with col2_macro:
