@@ -10,34 +10,7 @@ from dataclasses import dataclass
 # --- CONFIGURATION AND ADVANCED STYLE ---
 st.set_page_config(page_title="Climate Risk Intelligence", layout="wide", page_icon="🏛️")
 
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
-    
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-    .stApp { background-color: #f4f7f6; }
-    
-    [data-testid="metric-container"] {
-        background-color: #ffffff; border: 1px solid #e0e6ed; padding: 20px;
-        border-radius: 12px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04); transition: all 0.3s ease;
-    }
-    [data-testid="metric-container"]:hover {
-        transform: translateY(-4px); box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1); border-color: #cbd5e1;
-    }
-    [data-testid="stMetricValue"] { color: #1e293b; font-weight: 600; }
-    [data-testid="stMetricLabel"] { color: #64748b; font-size: 1.05rem; font-weight: 600; }
-    
-    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
-    .stTabs [data-baseweb="tab"] {
-        height: 45px; background-color: #ffffff; border-radius: 8px 8px 0 0;
-        border: 1px solid #e0e6ed; border-bottom: none; padding: 0 20px;
-        color: #64748b; font-weight: 600;
-    }
-    .stTabs [aria-selected="true"] { background-color: #0f172a; color: #ffffff !important; }
-    
-    [data-testid="stHeader"] { background: rgba(255,255,255,0); }
-    </style>
-    """, unsafe_allow_html=True)
+
 
 SCENARIOS = ["Optimistic", "Neutral", "Pessimistic", "Custom"]
 
