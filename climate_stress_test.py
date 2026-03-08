@@ -188,38 +188,58 @@ def main():
 
     # --- MODULE 3: GEOGRAPHIC EXPOSURE ---
     with tab_geo:
-        st.subheader("European Risk Mapping")
-        col_geo_ctrl, col_geo_viz = st.columns([1, 3])
-        
-        with col_geo_ctrl:
-            geo_sc = st.selectbox("Climate Scenario", SCENARIOS, key="geo_sc_2")
-            geo_metric = st.radio("Indicator to map", ["Projected Losses (€)", "Loss Rate (bps)", "Exposure (EAD)"])
+            st.subheader("European Risk Mapping")
             
-        df_geo = summarize(all_results[geo_sc], "country")
-        metric_col_map = {"Projected Losses (€)": "loss_projected", "Loss Rate (bps)": "Loss_Rate_bps", "Exposure (EAD)": "EAD_EUR"}
-        target_col = metric_col_map[geo_metric]
-        color_scale = "Blues" if target_col == "EAD_EUR" else "Reds"
+            # On donne encore plus de largeur à la carte visuelle (ratio 1 pour les boutons, 4 pour la carte)
+            col_geo_ctrl, col_geo_viz = st.columns([1, 4])
+            
+            with col_geo_ctrl:
+                geo_sc = st.selectbox("Climate Scenario", SCENARIOS, key="geo_sc_2")
+                geo_metric = st.radio("Indicator to map", ["Projected Losses (€)", "Loss Rate (bps)", "Exposure (EAD)"])
+                
+            df_geo = summarize(all_results[geo_sc], "country")
+            metric_col_map = {"Projected Losses (€)": "loss_projected", "Loss Rate (bps)": "Loss_Rate_bps", "Exposure (EAD)": "EAD_EUR"}
+            target_col = metric_col_map[geo_metric]
+            color_scale = "Blues" if target_col == "EAD_EUR" else "Reds"
 
-        with col_geo_viz:
-            df_geo["EAD (Euro)"] = df_geo["EAD_EUR"].apply(lambda x: f"{x:,.0f} €")
-            df_geo["Loss (Euro)"] = df_geo["loss_projected"].apply(lambda x: f"{x:,.0f} €")
-            df_geo["Rate (bps)"] = df_geo["Loss_Rate_bps"].apply(lambda x: f"{x:.1f} bps")
+            with col_geo_viz:
+                df_geo["EAD (Euro)"] = df_geo["EAD_EUR"].apply(lambda x: f"{x:,.0f} €")
+                df_geo["Loss (Euro)"] = df_geo["loss_projected"].apply(lambda x: f"{x:,.0f} €")
+                df_geo["Rate (bps)"] = df_geo["Loss_Rate_bps"].apply(lambda x: f"{x:.1f} bps")
 
-            fig_map = px.choropleth(
-                df_geo, locations="country", locationmode="country names", color=target_col, hover_name="country",
-                hover_data={"country": False, target_col: False, "EAD (Euro)": True, "Loss (Euro)": True, "Rate (bps)": True},
-                color_continuous_scale=color_scale, title=f"Spatial distribution: {geo_metric} ({geo_sc})"
+                # Nouvelle carte interactive Mapbox en mode sombre
+                fig_map = px.choropleth_mapbox(
+                    df_geo, 
+                    geojson="https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json",
+                    featureidkey="properties.name", # Relie vos noms de pays au fichier géographique
+                    locations="country", 
+                    color=target_col, 
+                    hover_name="country",
+                    hover_data={"country": False, target_col: False, "EAD (Euro)": True, "Loss (Euro)": True, "Rate (bps)": True},
+                    color_continuous_scale=color_scale, 
+                    title=f"Spatial distribution: {geo_metric} ({geo_sc})",
+                    mapbox_style="carto-darkmatter", # Le style sombre professionnel type "Google Maps de nuit"
+                    zoom=3.0, # Niveau de zoom idéal pour l'Europe
+                    center={"lat": 50.0, "lon": 10.0}, # Centrage sur le continent européen
+                    opacity=0.7 # Légère transparence des couleurs pour voir les villes/routes en dessous
+                )
+                
+                # Suppression des anciennes marges et forçage de la grande hauteur
+                fig_map.update_layout(
+                    font_family="Inter", 
+                    paper_bgcolor="rgba(0,0,0,0)", 
+                    margin={"r":0,"t":40,"l":0,"b":0},
+                    height=700 
+                ) 
+                
+                # Affichage en utilisant 100% de la largeur du conteneur
+                st.plotly_chart(fig_map, use_container_width=True)
+                
+            st.dataframe(
+                df_geo[["country", "EAD_EUR", "loss_projected", "Loss_Rate_bps"]].style.background_gradient(subset=['Loss_Rate_bps'], cmap='Reds').format({
+                    "EAD_EUR": "{:,.0f} €", "loss_projected": "{:,.0f} €", "Loss_Rate_bps": "{:.1f}"
+                }), use_container_width=True
             )
-            fig_map.update_geos(scope="europe", fitbounds="locations", showcountries=True, countrycolor="Black")
-            fig_map.update_layout(font_family="Inter", paper_bgcolor="rgba(0,0,0,0)", margin={"r":0,"t":40,"l":0,"b":0})
-            st.plotly_chart(fig_map, use_container_width=True)
-            
-        st.dataframe(
-            df_geo[["country", "EAD_EUR", "loss_projected", "Loss_Rate_bps"]].style.background_gradient(subset=['Loss_Rate_bps'], cmap='Reds').format({
-                "EAD_EUR": "{:,.0f} €", "loss_projected": "{:,.0f} €", "Loss_Rate_bps": "{:.1f}"
-            }), use_container_width=True
-        )
-
     # --- MODULE 4: METHODOLOGY & FRAMEWORK ---
     with tab_meth:
         st.subheader("Methodological Framework and Mathematical Model")
