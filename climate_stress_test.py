@@ -107,12 +107,14 @@ def main():
     scenario_totals = [{"Scenario": sc, "Losses": all_results[sc]["loss_projected"].sum()} for sc in SCENARIOS]
     
     # 4 TABS DECLARATION
-    tab_macro, tab_micro, tab_geo, tab_meth = st.tabs([
-        "📊 Module 1: Executive Dashboard", 
-        "🔍 Module 2: Portfolio Deep-Dive",
-        "🌍 Module 3: Geographic Exposure",
-        "📖 Module 4: Methodology & Framework"
-    ])
+    
+    tab_macro, tab_micro, tab_geo, tab_meth, tab_sim = st.tabs([
+    "📊 Module 1: Executive Dashboard", 
+    "🔍 Module 2: Portfolio Deep-Dive",
+    "🌍 Module 3: Geographic Exposure",
+    "📖 Module 4: Methodology & Framework",
+    "📈 Module 5: Client Simulation"
+])
 
     # --- MODULE 1: EXECUTIVE DASHBOARD ---
     with tab_macro:
@@ -293,6 +295,67 @@ def main():
             
         st.markdown("---")
         st.info("💡 **Static Balance Sheet Assumption:** EAD (Exposure At Default) is kept constant in this exercise. The model does not simulate portfolio renewal or mitigation (hedging) strategies by the bank. The climate impact is therefore read exclusively through credit risk migration.")
+        
+        
+        # --- MODULE 5: DASHBOARD CLIENT ---
+        
+    with tab_sim:
+            st.subheader("Simulateur de Résilience du Portefeuille (Monte Carlo)")
+            st.markdown("Testez l'évolution de vos finances face aux incertitudes du marché et aux chocs climatiques.")
+
+            # Formulaire de saisie des données client
+            col_in1, col_in2, col_in3 = st.columns(3)
+            with col_in1:
+                init_inv = st.number_input("Investissement Initial (€)", value=1000000, step=100000)
+                time_horizon = st.slider("Horizon de placement (Années)", min_value=1, max_value=30, value=10)
+            with col_in2:
+                mu = st.number_input("Rendement Annuel Espéré (%)", value=5.0, step=0.5) / 100
+                sigma = st.number_input("Volatilité Annuelle (%)", value=15.0, step=1.0) / 100
+            with col_in3:
+                climate_shock = st.number_input("Choc Climatique Annuel (%)", value=1.5, step=0.5, help="Pénalité sur le rendement due aux risques de transition") / 100
+                n_sims = st.selectbox("Nombre de Scénarios", [100, 500, 1000], index=1)
+
+            # Moteur de calcul au clic
+            if st.button("Lancer la Simulation de Monte Carlo", use_container_width=True):
+                np.random.seed(42) # Fixe l'aléatoire pour des résultats cohérents à chaque clic
+                dt = 1
+                adj_mu = mu - climate_shock # Ajustement du rendement avec le risque climat
+                
+                # Création de la matrice des trajectoires
+                paths = np.zeros((time_horizon + 1, n_sims))
+                paths[0] = init_inv
+                
+                # Simulation stochastique (GBM)
+                for t in range(1, time_horizon + 1):
+                    Z = np.random.standard_normal(n_sims)
+                    paths[t] = paths[t-1] * np.exp((adj_mu - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * Z)
+                
+                # Visualisation des trajectoires
+                fig_paths = go.Figure()
+                # On affiche un échantillon de 100 lignes max pour ne pas faire ralentir le navigateur
+                for i in range(min(100, n_sims)):
+                    fig_paths.add_trace(go.Scatter(x=np.arange(time_horizon + 1), y=paths[:, i], mode='lines', line=dict(width=1, color='rgba(0, 150, 255, 0.1)'), showlegend=False))
+                
+                # Ajout de la trajectoire moyenne en rouge
+                mean_path = np.mean(paths, axis=1)
+                fig_paths.add_trace(go.Scatter(x=np.arange(time_horizon + 1), y=mean_path, mode='lines', line=dict(width=3, color='#ff4b4b'), name='Trajectoire Moyenne'))
+                
+                fig_paths.update_layout(title="Trajectoires Simulées du Portefeuille Client", xaxis_title="Années", yaxis_title="Valeur du Portefeuille (€)", template="plotly_dark", height=500)
+                st.plotly_chart(fig_paths, use_container_width=True)
+                
+                # Calcul des métriques de risques (VaR et Expected Shortfall)
+                final_values = paths[-1]
+                var_95 = np.percentile(final_values, 5)
+                exp_shortfall = np.mean(final_values[final_values < var_95])
+                
+                # Affichage des résultats financiers
+                st.markdown("### Analyse des Risques (Fin de période)")
+                col_res1, col_res2, col_res3 = st.columns(3)
+                col_res1.metric("Valeur Finale Moyenne", f"{mean_path[-1]:,.0f} €")
+                col_res2.metric("Pire Scénario 5% (Value at Risk)", f"{var_95:,.0f} €", delta=f"{var_95 - init_inv:,.0f} €", delta_color="inverse")
+                col_res3.metric("Déficit Attendu (CVaR)", f"{exp_shortfall:,.0f} €")
+
+
 
 if __name__ == "__main__":
     main()
