@@ -6,6 +6,9 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from dataclasses import dataclass
+import streamlit as st
+import numpy as np
+import plotly.graph_objects as go
 
 # --- CONFIGURATION AND ADVANCED STYLE ---
 st.set_page_config(page_title="Climate Risk Intelligence", layout="wide", page_icon="🏛️")
@@ -297,64 +300,95 @@ def main():
         st.info("💡 **Static Balance Sheet Assumption:** EAD (Exposure At Default) is kept constant in this exercise. The model does not simulate portfolio renewal or mitigation (hedging) strategies by the bank. The climate impact is therefore read exclusively through credit risk migration.")
         
         
-        # --- MODULE 5: DASHBOARD CLIENT ---
-        
     with tab_sim:
-            st.subheader("Simulateur de Résilience du Portefeuille (Monte Carlo)")
-            st.markdown("Testez l'évolution de vos finances face aux incertitudes du marché et aux chocs climatiques.")
+        st.subheader("Simulateur de Résilience du Portefeuille (Monte Carlo)")
+    st.markdown("Testez l'évolution de vos finances face aux incertitudes du marché et aux chocs climatiques.")
 
-            # Formulaire de saisie des données client
-            col_in1, col_in2, col_in3 = st.columns(3)
-            with col_in1:
-                init_inv = st.number_input("Investissement Initial (€)", value=1000000, step=100000)
-                time_horizon = st.slider("Horizon de placement (Années)", min_value=1, max_value=30, value=10)
-            with col_in2:
-                mu = st.number_input("Rendement Annuel Espéré (%)", value=5.0, step=0.5) / 100
-                sigma = st.number_input("Volatilité Annuelle (%)", value=15.0, step=1.0) / 100
-            with col_in3:
-                climate_shock = st.number_input("Choc Climatique Annuel (%)", value=1.5, step=0.5, help="Pénalité sur le rendement due aux risques de transition") / 100
-                n_sims = st.selectbox("Nombre de Scénarios", [100, 500, 1000], index=1)
+    # Formulaire de saisie des données client optimisé
+    col_in1, col_in2, col_in3 = st.columns(3)
+    
+    with col_in1:
+        init_inv = st.number_input("Investissement Initial (€)", value=1000000, step=100000)
+        time_horizon = st.slider("Horizon de placement (Années)", min_value=1, max_value=30, value=10)
+        
+    with col_in2:
+        mu = st.number_input("Rendement Annuel Espéré (%)", value=5.0, step=0.5) / 100
+        sigma = st.number_input("Volatilité Annuelle (%)", value=15.0, step=1.0) / 100
+        
+    with col_in3:
+        climate_shock_mu = st.number_input("Choc Climat sur Rendement (%)", value=1.5, step=0.5, help="Baisse du rendement due aux risques de transition") / 100
+        climate_shock_vol = st.number_input("Choc Climat sur Volatilité (%)", value=2.0, step=0.5, help="Hausse de l'incertitude due aux événements climatiques") / 100
+        n_sims = st.selectbox("Nombre de Scénarios", [100, 500, 1000, 5000], index=2)
 
-            # Moteur de calcul au clic
-            if st.button("Lancer la Simulation de Monte Carlo", use_container_width=True):
-                np.random.seed(42) # Fixe l'aléatoire pour des résultats cohérents à chaque clic
-                dt = 1
-                adj_mu = mu - climate_shock # Ajustement du rendement avec le risque climat
-                
-                # Création de la matrice des trajectoires
-                paths = np.zeros((time_horizon + 1, n_sims))
-                paths[0] = init_inv
-                
-                # Simulation stochastique (GBM)
-                for t in range(1, time_horizon + 1):
-                    Z = np.random.standard_normal(n_sims)
-                    paths[t] = paths[t-1] * np.exp((adj_mu - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * Z)
-                
-                # Visualisation des trajectoires
-                fig_paths = go.Figure()
-                # On affiche un échantillon de 100 lignes max pour ne pas faire ralentir le navigateur
-                for i in range(min(100, n_sims)):
-                    fig_paths.add_trace(go.Scatter(x=np.arange(time_horizon + 1), y=paths[:, i], mode='lines', line=dict(width=1, color='rgba(0, 150, 255, 0.1)'), showlegend=False))
-                
-                # Ajout de la trajectoire moyenne en rouge
-                mean_path = np.mean(paths, axis=1)
-                fig_paths.add_trace(go.Scatter(x=np.arange(time_horizon + 1), y=mean_path, mode='lines', line=dict(width=3, color='#ff4b4b'), name='Trajectoire Moyenne'))
-                
-                fig_paths.update_layout(title="Trajectoires Simulées du Portefeuille Client", xaxis_title="Années", yaxis_title="Valeur du Portefeuille (€)", template="plotly_dark", height=500)
-                st.plotly_chart(fig_paths, use_container_width=True)
-                
-                # Calcul des métriques de risques (VaR et Expected Shortfall)
-                final_values = paths[-1]
-                var_95 = np.percentile(final_values, 5)
-                exp_shortfall = np.mean(final_values[final_values < var_95])
-                
-                # Affichage des résultats financiers
-                st.markdown("### Analyse des Risques (Fin de période)")
-                col_res1, col_res2, col_res3 = st.columns(3)
-                col_res1.metric("Valeur Finale Moyenne", f"{mean_path[-1]:,.0f} €")
-                col_res2.metric("Pire Scénario 5% (Value at Risk)", f"{var_95:,.0f} €", delta=f"{var_95 - init_inv:,.0f} €", delta_color="inverse")
-                col_res3.metric("Déficit Attendu (CVaR)", f"{exp_shortfall:,.0f} €")
+    # Moteur de calcul au clic
+    if st.button("Lancer la Simulation de Monte Carlo", use_container_width=True):
+        np.random.seed(42) # Fixe l'aléatoire pour la reproductibilité
+        dt = 1
+        
+        # Ajustement des paramètres stochastiques avec le risque climat
+        adj_mu = mu - climate_shock_mu
+        adj_sigma = sigma + climate_shock_vol 
+        
+        # Création de la matrice des trajectoires
+        paths = np.zeros((time_horizon + 1, n_sims))
+        paths[0] = init_inv
+        
+        # Simulation stochastique (Mouvement Brownien Géométrique)
+        for t in range(1, time_horizon + 1):
+            Z = np.random.standard_normal(n_sims)
+            paths[t] = paths[t-1] * np.exp((adj_mu - 0.5 * adj_sigma**2) * dt + adj_sigma * np.sqrt(dt) * Z)
+        
+        # Extraction des métriques de risques pour l'affichage
+        final_values = paths[-1]
+        var_95 = np.percentile(final_values, 5)
+        exp_shortfall = np.mean(final_values[final_values < var_95])
+        mean_path = np.mean(paths, axis=1)
+        quant_5 = np.percentile(paths, 5, axis=1)
+        quant_95 = np.percentile(paths, 95, axis=1)
 
+        # --- Affichage des KPI Financiers ---
+        st.markdown("### Analyse des Risques (Fin de période)")
+        col_res1, col_res2, col_res3 = st.columns(3)
+        col_res1.metric("Valeur Finale Moyenne", f"{mean_path[-1]:,.0f} €")
+        col_res2.metric("Pire Scénario 5% (Value at Risk)", f"{var_95:,.0f} €", delta=f"{var_95 - init_inv:,.0f} €", delta_color="inverse")
+        col_res3.metric("Déficit Attendu (CVaR)", f"{exp_shortfall:,.0f} €")
+
+        # --- Graphique 1 : Trajectoires avec Intervalle de Confiance ---
+        fig_paths = go.Figure()
+        
+        # Ajout du cône d'incertitude (90% des scénarios)
+        fig_paths.add_trace(go.Scatter(
+            x=np.concatenate([np.arange(time_horizon + 1), np.arange(time_horizon + 1)[::-1]]),
+            y=np.concatenate([quant_95, quant_5[::-1]]),
+            fill='toself',
+            fillcolor='rgba(255, 75, 75, 0.15)',
+            line=dict(color='rgba(255,255,255,0)'),
+            name='Intervalle de Confiance (90%)'
+        ))
+
+        # Affichage d'un échantillon réduit de trajectoires pour la performance web
+        for i in range(min(50, n_sims)):
+            fig_paths.add_trace(go.Scatter(
+                x=np.arange(time_horizon + 1), y=paths[:, i], 
+                mode='lines', line=dict(width=1, color='rgba(0, 150, 255, 0.1)'), showlegend=False
+            ))
+        
+        # Trajectoire moyenne
+        fig_paths.add_trace(go.Scatter(
+            x=np.arange(time_horizon + 1), y=mean_path, 
+            mode='lines', line=dict(width=3, color='#ff4b4b'), name='Trajectoire Moyenne'
+        ))
+        
+        fig_paths.update_layout(title="Trajectoires Simulées et Impact Climatique", xaxis_title="Années", yaxis_title="Valeur du Portefeuille (€)", template="plotly_dark", height=450)
+        
+        # --- Graphique 2 : Histogramme de Distribution (VaR) ---
+        fig_hist = go.Figure(data=[go.Histogram(x=final_values, nbinsx=60, marker_color='#0096ff')])
+        fig_hist.add_vline(x=var_95, line_dash="dash", line_color="#ff4b4b", line_width=3, annotation_text="VaR 95%", annotation_position="top right")
+        fig_hist.update_layout(title="Distribution des Valeurs Finales du Portefeuille (Horizon atteint)", xaxis_title="Valeur du Portefeuille (€)", yaxis_title="Fréquence des Scénarios", template="plotly_dark", height=350)
+
+        # Rendu sur Streamlit
+        st.plotly_chart(fig_paths, use_container_width=True)
+        st.plotly_chart(fig_hist, use_container_width=True)
 
 
 if __name__ == "__main__":
