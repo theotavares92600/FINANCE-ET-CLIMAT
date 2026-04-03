@@ -300,9 +300,11 @@ def main():
         st.info("💡 **Static Balance Sheet Assumption:** EAD (Exposure At Default) is kept constant in this exercise. The model does not simulate portfolio renewal or mitigation (hedging) strategies by the bank. The climate impact is therefore read exclusively through credit risk migration.")
         
         
+    # --- MODULE 5: DASHBOARD CLIENT ---
+
     with tab_sim:
         st.subheader("Simulateur de Résilience du Portefeuille (Monte Carlo)")
-    st.markdown("Testez l'évolution de vos finances face aux incertitudes du marché et aux chocs climatiques.")
+        st.markdown("Testez l'évolution de vos finances face aux incertitudes du marché et aux chocs climatiques.")
 
     # Formulaire de saisie des données client optimisé
     col_in1, col_in2, col_in3 = st.columns(3)
