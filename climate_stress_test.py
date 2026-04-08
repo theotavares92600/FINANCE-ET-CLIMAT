@@ -165,31 +165,98 @@ def main():
         if len(top_sectors) > 1: t2.warning(f"**2. {top_sectors[1]['sector']}**\n\n**Loss:** {top_sectors[1]['loss_projected']:,.0f} €\n\n**Rate:** {top_sectors[1]['Loss_Rate_bps']:.1f} bps")
         if len(top_sectors) > 2: t3.info(f"**3. {top_sectors[2]['sector']}**\n\n**Loss:** {top_sectors[2]['loss_projected']:,.0f} €\n\n**Rate:** {top_sectors[2]['Loss_Rate_bps']:.1f} bps")
 
-    # --- MODULE 2: PORTFOLIO DEEP-DIVE ---
+ # --- MODULE 2: PORTFOLIO DEEP-DIVE ---
     with tab_micro:
         st.subheader("Granular Analysis & Concentration")
-        col_ctrl, col_viz = st.columns([1, 3])
         
-        with col_ctrl:
+        # 1. Filtres placés en haut pour libérer toute la largeur
+        col_ctrl1, col_ctrl2 = st.columns(2)
+        with col_ctrl1:
             target_sc = st.selectbox("Target Scenario", SCENARIOS, key="micro_sc")
-            dim = st.radio("Group by", ["sector", "country", "region"])
-            df_dim = summarize(all_results[target_sc], dim)
+        with col_ctrl2:
+            dim = st.radio("Group by", ["sector", "country", "region"], horizontal=True)
+            
+        df_dim = summarize(all_results[target_sc], dim)
+        
+        # 2. Ajout des KPIs de synthèse dynamiques
+        total_ead = all_results[target_sc]['EAD_EUR'].sum()
+        total_loss = all_results[target_sc]['loss_projected'].sum()
+        top_cat = df_dim.loc[df_dim['loss_projected'].idxmax(), dim] if not df_dim.empty else "N/A"
+        
+        col_m1, col_m2, col_m3 = st.columns(3)
+        col_m1.metric("Exposition Totale (EAD)", f"{total_ead / 1e9:,.2f} Md €")
+        col_m2.metric("Perte Projetée Globale", f"{total_loss / 1e6:,.2f} M €")
+        col_m3.metric(f"Concentration Max ({dim})", top_cat)
+        
+        st.markdown("<br>", unsafe_allow_html=True) # Espacement léger
+        
+        # 3. Treemap en pleine largeur
+        fig_tree = px.treemap(
+            df_dim, 
+            path=[dim], 
+            values='loss_projected', 
+            color='Loss_Rate_bps', 
+            color_continuous_scale='RdYlGn_r', 
+            title=f"Loss concentration by {dim} (bps)"
+        )
+        fig_tree.update_layout(font_family="Inter", paper_bgcolor="rgba(0,0,0,0)")
+        st.plotly_chart(fig_tree, use_container_width=True)
 
-        with col_viz:
-            fig_tree = px.treemap(df_dim, path=[dim], values='loss_projected', color='Loss_Rate_bps', color_continuous_scale='RdYlGn_r', title=f"Loss concentration by {dim} (bps)")
-            fig_tree.update_layout(font_family="Inter", paper_bgcolor="rgba(0,0,0,0)")
-            st.plotly_chart(fig_tree, use_container_width=True)
-
+        # 4. Tableau de données interactif avec st.column_config
         st.markdown("#### Position Details (Top 50)")
+        df_top50 = all_results[target_sc].sort_values("loss_projected", ascending=False).head(50)
+        
         st.dataframe(
-            all_results[target_sc].sort_values("loss_projected", ascending=False).head(50).style.format({
-                "EAD_EUR": "{:,.0f} €", "PD_base": "{:.2%}", "PD_stress": "{:.2%}", "loss_projected": "{:,.2f} €"
-            }), use_container_width=True
+            df_top50,
+            column_config={
+                "loan_id": "ID Prêt",
+                "sector": "Secteur",
+                "country": "Pays",
+                "region": "Région",
+                "EAD_EUR": st.column_config.NumberColumn(
+                    "Exposition (EAD)", 
+                    format="%d €"
+                ),
+                "PD_base": st.column_config.NumberColumn(
+                    "PD Initiale", 
+                    format="%.4f"
+                ),
+                "PD_stress": st.column_config.ProgressColumn(
+                    "PD Stressée", 
+                    format="%.4f", 
+                    min_value=0, 
+                    max_value=0.15 # Ajustable selon vos stress max (ici 15%)
+                ),
+                "LGD": st.column_config.NumberColumn(
+                    "LGD", 
+                    format="%.2f"
+                ),
+                "LGD_stress": st.column_config.NumberColumn(
+                    "LGD Stressée", 
+                    format="%.2f"
+                ),
+                "loss_projected": st.column_config.NumberColumn(
+                    "Perte Projetée", 
+                    format="%d €"
+                ),
+                # Masquage des colonnes redondantes pour un affichage plus propre
+                "scenario": None, 
+                "pd_uplift": None,
+                "lgd_uplift": None,
+                "maturity_years": None
+            },
+            hide_index=True,
+            use_container_width=True
         )
 
         st.markdown("---")
         csv_data = convert_df(all_results[target_sc])
-        st.download_button(label=f"📥 Download full results ({target_sc}) as CSV", data=csv_data, file_name=f"stress_test_results_{target_sc.lower()}.csv", mime="text/csv")
+        st.download_button(
+            label=f"📥 Download full results ({target_sc}) as CSV", 
+            data=csv_data, 
+            file_name=f"stress_test_results_{target_sc.lower()}.csv", 
+            mime="text/csv"
+        )
 
     # --- MODULE 3: GEOGRAPHIC EXPOSURE ---
     with tab_geo:
