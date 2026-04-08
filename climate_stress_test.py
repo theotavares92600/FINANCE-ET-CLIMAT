@@ -258,7 +258,10 @@ def main():
             mime="text/csv"
         )
 
-# --- MODULE 3: GEOGRAPHIC EXPOSURE ---
+
+
+
+    # --- MODULE 3: GEOGRAPHIC EXPOSURE ---
     with tab_geo:
         st.subheader("European Risk Mapping")
         
@@ -287,30 +290,33 @@ def main():
         
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Nouvelle carte native centrée sur l'Europe
-        fig_map = px.choropleth(
-            df_geo,
-            locations="country",
-            locationmode="country names",
-            color=target_col,
+        # --- RETOUR À LA CARTE MAPBOX SOMBRE ---
+        df_geo["EAD (Euro)"] = df_geo["EAD_EUR"].apply(lambda x: f"{x:,.0f} €")
+        df_geo["Loss (Euro)"] = df_geo["loss_projected"].apply(lambda x: f"{x:,.0f} €")
+        df_geo["Rate (bps)"] = df_geo["Loss_Rate_bps"].apply(lambda x: f"{x:.1f} bps")
+
+        fig_map = px.choropleth_mapbox(
+            df_geo, 
+            geojson="https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json",
+            featureidkey="properties.name", 
+            locations="country", 
+            color=target_col, 
             hover_name="country",
-            color_continuous_scale=color_scale,
-            scope="europe",
-            title=f"Spatial distribution: {geo_metric} ({geo_sc})"
+            hover_data={"country": False, target_col: False, "EAD (Euro)": True, "Loss (Euro)": True, "Rate (bps)": True},
+            color_continuous_scale=color_scale, 
+            title=f"Spatial distribution: {geo_metric} ({geo_sc})",
+            mapbox_style="carto-darkmatter", # Le style sombre professionnel
+            zoom=3.2, # Zoom resserré sur l'Europe
+            center={"lat": 49.0, "lon": 10.0}, # Centrage sur l'Europe continentale
+            opacity=0.75 
         )
         
-        # Design sombre et intégration au fond de l'application
         fig_map.update_layout(
-            font_family="Inter",
-            paper_bgcolor="rgba(0,0,0,0)",
-            geo=dict(
-                bgcolor='rgba(0,0,0,0)', 
-                showcoastlines=True, 
-                coastlinecolor="rgba(255,255,255,0.2)"
-            ),
+            font_family="Inter", 
+            paper_bgcolor="rgba(0,0,0,0)", 
             margin={"r":0,"t":40,"l":0,"b":0},
-            height=650
-        )
+            height=700 
+        ) 
         
         st.plotly_chart(fig_map, use_container_width=True)
         
