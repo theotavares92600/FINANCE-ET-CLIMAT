@@ -300,31 +300,32 @@ def main():
         st.info("💡 **Static Balance Sheet Assumption:** EAD (Exposure At Default) is kept constant in this exercise. The model does not simulate portfolio renewal or mitigation (hedging) strategies by the bank. The climate impact is therefore read exclusively through credit risk migration.")
         
         
-    # --- MODULE 5: DASHBOARD CLIENT ---
+# --- MODULE 5: DASHBOARD CLIENT ---
 
     with tab_sim:
         st.subheader("Simulateur de Résilience du Portefeuille (Monte Carlo)")
-        st.markdown("Testez l'évolution de vos finances face aux incertitudes du marché et aux chocs climatiques.")
+        st.markdown("Testez l'évolution de vos finances en temps réel face aux incertitudes du marché et aux chocs climatiques.")
 
-    # Formulaire de saisie des données client optimisé
-    col_in1, col_in2, col_in3 = st.columns(3)
-    
-    with col_in1:
-        init_inv = st.number_input("Investissement Initial (€)", value=1000000, step=100000)
-        time_horizon = st.slider("Horizon de placement (Années)", min_value=1, max_value=30, value=10)
+        # Formulaire de saisie des données client optimisé
+        col_in1, col_in2, col_in3 = st.columns(3)
         
-    with col_in2:
-        mu = st.number_input("Rendement Annuel Espéré (%)", value=5.0, step=0.5) / 100
-        sigma = st.number_input("Volatilité Annuelle (%)", value=15.0, step=1.0) / 100
-        
-    with col_in3:
-        climate_shock_mu = st.number_input("Choc Climat sur Rendement (%)", value=1.5, step=0.5, help="Baisse du rendement due aux risques de transition") / 100
-        climate_shock_vol = st.number_input("Choc Climat sur Volatilité (%)", value=2.0, step=0.5, help="Hausse de l'incertitude due aux événements climatiques") / 100
-        n_sims = st.selectbox("Nombre de Scénarios", [100, 500, 1000, 5000], index=2)
+        with col_in1:
+            init_inv = st.number_input("Investissement Initial (€)", value=1000000, step=100000)
+            time_horizon = st.slider("Horizon de placement (Années)", min_value=1, max_value=30, value=10)
+            
+        with col_in2:
+            mu = st.number_input("Rendement Annuel Espéré (%)", value=5.0, step=0.5) / 100
+            sigma = st.number_input("Volatilité Annuelle (%)", value=15.0, step=1.0) / 100
+            
+        with col_in3:
+            climate_shock_mu = st.number_input("Choc Climat sur Rendement (%)", value=1.5, step=0.5, help="Baisse du rendement due aux risques de transition") / 100
+            climate_shock_vol = st.number_input("Choc Climat sur Volatilité (%)", value=2.0, step=0.5, help="Hausse de l'incertitude due aux événements climatiques") / 100
+            n_sims = st.selectbox("Nombre de Scénarios", [100, 500, 1000, 5000], index=2)
 
-    # Moteur de calcul au clic
-    if st.button("Lancer la Simulation de Monte Carlo", use_container_width=True):
-        np.random.seed(42) # Fixe l'aléatoire pour la reproductibilité
+        # --- MOTEUR DE CALCUL EN TEMPS RÉEL ---
+        # Le calcul s'exécute désormais instantanément à chaque modification d'un paramètre
+        
+        np.random.seed(42) # Maintient la forme des courbes pour une déformation fluide
         dt = 1
         
         # Ajustement des paramètres stochastiques avec le risque climat
