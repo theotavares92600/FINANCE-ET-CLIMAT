@@ -392,6 +392,84 @@ def main():
         # Rendu sur Streamlit
         st.plotly_chart(fig_paths, use_container_width=True)
         st.plotly_chart(fig_hist, use_container_width=True)
+        
+        # --- MOTEUR DE CALCUL EN TEMPS RÉEL (DOUBLE SCÉNARIO) ---
+        np.random.seed(42) 
+        dt = 1
+        
+        adj_mu = mu - climate_shock_mu
+        adj_sigma = sigma + climate_shock_vol 
+        
+        paths_base = np.zeros((time_horizon + 1, n_sims))
+        paths_stressed = np.zeros((time_horizon + 1, n_sims))
+        paths_base[0] = init_inv
+        paths_stressed[0] = init_inv
+        
+        # Simulation simultanée des deux univers
+        for t in range(1, time_horizon + 1):
+            Z = np.random.standard_normal(n_sims)
+            # Univers normal (sans choc)
+            paths_base[t] = paths_base[t-1] * np.exp((mu - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * Z)
+            # Univers stressé (avec choc climatique)
+            paths_stressed[t] = paths_stressed[t-1] * np.exp((adj_mu - 0.5 * adj_sigma**2) * dt + adj_sigma * np.sqrt(dt) * Z)
+        
+        # Extraction des métriques de risques (sur le portefeuille stressé)
+        final_values = paths_stressed[-1]
+        var_95 = np.percentile(final_values, 5)
+        exp_shortfall = np.mean(final_values[final_values < var_95])
+        
+        mean_path_base = np.mean(paths_base, axis=1)
+        mean_path_stressed = np.mean(paths_stressed, axis=1)
+        
+        quant_5_stressed = np.percentile(paths_stressed, 5, axis=1)
+        quant_95_stressed = np.percentile(paths_stressed, 95, axis=1)
+
+        # --- Affichage des KPI Financiers ---
+        st.markdown("### Analyse des Risques (Fin de période)")
+        col_res1, col_res2, col_res3 = st.columns(3)
+        col_res1.metric("Valeur Finale Moyenne (Stressée)", f"{mean_path_stressed[-1]:,.0f} €", delta=f"{mean_path_stressed[-1] - mean_path_base[-1]:,.0f} € vs Baseline")
+        col_res2.metric("Pire Scénario 5% (Value at Risk)", f"{var_95:,.0f} €", delta=f"{var_95 - init_inv:,.0f} €", delta_color="inverse")
+        col_res3.metric("Déficit Attendu (CVaR)", f"{exp_shortfall:,.0f} €")
+
+        # --- Graphique 1 : Trajectoires Comparatives ---
+        fig_paths = go.Figure()
+        
+        # Cône d'incertitude (Univers stressé)
+        fig_paths.add_trace(go.Scatter(
+            x=np.concatenate([np.arange(time_horizon + 1), np.arange(time_horizon + 1)[::-1]]),
+            y=np.concatenate([quant_95_stressed, quant_5_stressed[::-1]]),
+            fill='toself', fillcolor='rgba(255, 75, 75, 0.15)', line=dict(color='rgba(255,255,255,0)'),
+            name='Intervalle de Confiance Climat (90%)'
+        ))
+
+        # Échantillon de trajectoires (Univers stressé)
+        for i in range(min(50, n_sims)):
+            fig_paths.add_trace(go.Scatter(
+                x=np.arange(time_horizon + 1), y=paths_stressed[:, i], 
+                mode='lines', line=dict(width=1, color='rgba(0, 150, 255, 0.05)'), showlegend=False
+            ))
+        
+        # Trajectoire moyenne BASELINE (Sans choc) - Ligne pointillée verte
+        fig_paths.add_trace(go.Scatter(
+            x=np.arange(time_horizon + 1), y=mean_path_base, 
+            mode='lines', line=dict(width=3, color='#00cc96', dash='dot'), name='Baseline (Sans Choc)'
+        ))
+
+        # Trajectoire moyenne STRESSÉE - Ligne rouge
+        fig_paths.add_trace(go.Scatter(
+            x=np.arange(time_horizon + 1), y=mean_path_stressed, 
+            mode='lines', line=dict(width=3, color='#ff4b4b'), name='Trajectoire Moyenne (Stressée)'
+        ))
+        
+        fig_paths.update_layout(title="Comparaison Baseline vs Choc Climatique", xaxis_title="Années", yaxis_title="Valeur du Portefeuille (€)", template="plotly_dark", height=450)
+        
+        # --- Graphique 2 : Histogramme de Distribution (VaR) ---
+        fig_hist = go.Figure(data=[go.Histogram(x=final_values, nbinsx=60, marker_color='#0096ff')])
+        fig_hist.add_vline(x=var_95, line_dash="dash", line_color="#ff4b4b", line_width=3, annotation_text="VaR 95%", annotation_position="top right")
+        fig_hist.update_layout(title="Distribution des Valeurs Finales du Portefeuille (Univers Stressé)", xaxis_title="Valeur du Portefeuille (€)", yaxis_title="Fréquence des Scénarios", template="plotly_dark", height=350)
+
+        st.plotly_chart(fig_paths, use_container_width=True)
+        st.plotly_chart(fig_hist, use_container_width=True)
 
 
 if __name__ == "__main__":
